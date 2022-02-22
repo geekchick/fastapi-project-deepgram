@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Chat</title>
+    </head>
+    <body>
+        <h1>Transcribe Audio</h1>
+
+        <div>
+            <button id="start">Start</button>
+            <button id="stop">Stop</button>
+        </div><br/>
+
+        <div id="messages"></div>
+       
+        <script>
+            const messagesDiv = document.getElementById('messages');
+            const startButton = document.getElementById('start');
+            const stopButton = document.getElementById('stop');
+
+            const getSetup = function(stream) {
+
+                    const mediaRecorder = new MediaRecorder(stream, {
+                            mimeType: 'audio/webm',
+                    })
+
+                   
+                    var socket = new WebSocket('ws://localhost:8000/ws');
+
+                    socket.onopen = () => {
+                        mediaRecorder.addEventListener('dataavailable', async (event) => {
+                            if (event.data.size > 0 && socket.readyState == 1) {
+                                socket.send(event.data)
+                            }
+                        })
+                        mediaRecorder.start(250)
+                        }
+
+                    socket.onmessage = (message) => {
+                        let messageNode = document.createElement('div');
+                        messageNode.innerHTML = message.data
+                        messagesDiv.appendChild(messageNode)
+                    }
+
+                    startButton.addEventListener('click', function() {
+                        mediaRecorder.start();
+                    });
+
+                    stopButton.addEventListener('click', function() {
+                        mediaRecorder.stop();
+                    });
+            }
+ 
+
+            navigator.mediaDevices.getUserMedia({ audio: true})
+                .then(getSetup);
+      
+        </script>
+    </body>
+</html>
