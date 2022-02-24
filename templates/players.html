@@ -6,11 +6,10 @@
     <body>
         <h1>Transcribe Audio With FastAPI</h1>
         <p id="status">Connection status will go here</p>
-        <p id="transcript">Deepgram transcript will go here</p>
+        <p id="transcript"></p>
        
         <script>
            navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-            // console.log({ stream }) remove
             if (!MediaRecorder.isTypeSupported('audio/webm'))
                 return alert('Browser not supported')
 
@@ -22,24 +21,19 @@
 
             socket.onopen = () => {
                 document.querySelector('#status').textContent = 'Connected'
-                // console.log({ event: 'onopen' }) // remove
                 mediaRecorder.addEventListener('dataavailable', async (event) => {
-                        if (event.data.size > 0 && socket.readyState == 1) {
+                    if (event.data.size > 0 && socket.readyState == 1) {
                         socket.send(event.data)
                     }
             })
-            mediaRecorder.start(1000)
+            mediaRecorder.start(250)
             }
 
             socket.onmessage = (message) => {
                 const received = message.data
                 if (received) {
-                    console.log(message.data)
-                    document.querySelector('#transcript').textContent = message.data += ' '
-                    // console.log(typeof(msgData))
-
-                    // lineBreak = document.createElement('br')
-                    // const msgData = document.querySelector('#transcript').textContent = message.data + '\n '
+                    document.querySelector('#transcript').textContent +=  ' ' + message.data
+                  
 
                 }
 
