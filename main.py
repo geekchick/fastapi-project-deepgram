@@ -21,17 +21,17 @@ dg_client = Deepgram(os.getenv('DEEPGRAM_API_KEY'))
 templates = Jinja2Templates(directory="templates")
 
 
-async def process_audio(socket: WebSocket, data):
+async def process_audio(connection: WebSocket, data: dict) -> WebSocket:
     if 'channel' in data:
         transcript = data['channel']['alternatives'][0]['transcript']
     
         if transcript:
-            await socket.send_text(transcript)
+            await connection.send_text(transcript)
 
-        return socket
+        return connection
 
 
-async def connect_to_deepgram():
+async def connect_to_deepgram() -> WebSocket:
     def on_connection_closed(exit_code: int) -> int:
         exit(0)
 
@@ -57,6 +57,6 @@ async def websocket_endpoint(websocket: WebSocket): # websocket that connects th
 
     while True:
         data = await websocket.receive_bytes() # while True receive bytes
-        deepgram_socket = await connect_to_deepgram() # connect to deepgram
-        await process_audio(deepgram_socket, data) # then process the audio
+        deepgram_connection = await connect_to_deepgram() # connect to deepgram
+        await process_audio(deepgram_connection, data) # then process the audio
  
