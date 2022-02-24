@@ -1,3 +1,4 @@
+from ast import Bytes
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -9,10 +10,7 @@ from deepgram import Deepgram
 import os
 import re
 
-KEYWORDS = {
-                "michael jordan": "red",
-                "flu": "green"
-            }
+from main_old import connect_to_deepgram
 
 load_dotenv()
 
@@ -23,53 +21,42 @@ dg_client = Deepgram(os.getenv('DEEPGRAM_API_KEY'))
 templates = Jinja2Templates(directory="templates")
 
 
-def format_string(matchobj) -> str:
-    matched_string = matchobj.group(0)
-    color = KEYWORDS.get(matched_string.lower())
-    return r'<span style="background-color: {}">{}</span>'.format(color, matched_string)
+async def process_audio(socket: WebSocket, data):
+    if 'channel' in data:
+        transcript = data['channel']['alternatives'][0]['transcript']
+    
+        if transcript:
+            await socket.send_text(transcript)
 
-def format_transcript_helper(transcript, keywords) -> str:
-    terms = "|".join(keywords.keys())
-    test_search = r"({})".format(terms)
-    formatted_transcript = re.sub(test_search, format_string, transcript, flags=re.IGNORECASE)
+        return socket
 
-    return formatted_transcript
 
-async def process_audio(fast_socket: WebSocket):
-    async def get_transcript(data: Dict) -> None:
-        if 'channel' in data:
-            transcript = data['channel']['alternatives'][0]['transcript']
-        
-            if transcript:
-                formatted_transcript = format_transcript_helper(transcript, KEYWORDS) 
-
-                await fast_socket.send_text(formatted_transcript)
-
-    deepgram_socket = await connect_to_deepgram(get_transcript)
-
-    while fast_socket.application_state == WebSocketState.CONNECTED:
-        data = await fast_socket.receive_bytes()
-        deepgram_socket.send(data)
-
-async def connect_to_deepgram(transcript_received_handler: Callable[[Dict], None]) -> str:
+async def connect_to_deepgram():
     def on_connection_closed(exit_code: int) -> int:
         exit(0)
 
     try:
-        socket = await dg_client.transcription.live({'punctuate': True, 'interim_results': False})
-        socket.registerHandler(socket.event.CLOSE, on_connection_closed)
-        socket.registerHandler(socket.event.TRANSCRIPT_RECEIVED, transcript_received_handler)
+        deepgram_socket = await dg_client.transcription.live({'punctuate': True, 'interim_results': False})
+        deepgram_socket.registerHandler(deepgram_socket.event.CLOSE, on_connection_closed)
+        deepgram_socket.registerHandler(deepgram_socket.event.TRANSCRIPT_RECEIVED, print)
 
-        return socket
+        return deepgram_socket
+
     except Exception as e:
         raise Exception(f'Could not open socket: {e}')
+
+
 
 @app.get("/", response_class=HTMLResponse)
 def get(request: Request):
     return templates.TemplateResponse("players.html", {"request": request})
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+@app.websocket("/listen")
+async def websocket_endpoint(websocket: WebSocket): # websocket that connects the client and server
     await websocket.accept()
-    await process_audio(websocket)
-    await websocket.close()
+
+    while True:
+        data = await websocket.receive_bytes() # while True receive bytes
+        deepgram_socket = await connect_to_deepgram() # connect to deepgram
+        await process_audio(deepgram_socket, data) # then process the audio
+ 

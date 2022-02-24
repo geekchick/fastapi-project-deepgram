@@ -4,57 +4,49 @@
         <title>Chat</title>
     </head>
     <body>
-        <h1>Transcribe Audio</h1>
-
-        <div>
-            <button id="start">Start</button>
-            <button id="stop">Stop</button>
-        </div><br/>
-
-        <div id="messages"></div>
+        <h1>Transcribe Audio With FastAPI</h1>
+        <p id="status">Connection status will go here</p>
+        <p id="transcript">Deepgram transcript will go here</p>
        
         <script>
-            const messagesDiv = document.getElementById('messages');
-            const startButton = document.getElementById('start');
-            const stopButton = document.getElementById('stop');
+           navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+            // console.log({ stream }) remove
+            if (!MediaRecorder.isTypeSupported('audio/webm'))
+                return alert('Browser not supported')
 
-            const getSetup = function(stream) {
+            const mediaRecorder = new MediaRecorder(stream, {
+                mimeType: 'audio/webm',
+            })
 
-                    const mediaRecorder = new MediaRecorder(stream, {
-                            mimeType: 'audio/webm',
-                    })
+            const socket = new WebSocket('ws://localhost:8000/listen')
 
-                   
-                    var socket = new WebSocket('ws://localhost:8000/ws');
-
-                    socket.onopen = () => {
-                        mediaRecorder.addEventListener('dataavailable', async (event) => {
-                            if (event.data.size > 0 && socket.readyState == 1) {
-                                socket.send(event.data)
-                            }
-                        })
-                        mediaRecorder.start(250)
-                        }
-
-                    socket.onmessage = (message) => {
-                        let messageNode = document.createElement('div');
-                        messageNode.innerHTML = message.data
-                        messagesDiv.appendChild(messageNode)
+            socket.onopen = () => {
+                document.querySelector('#status').textContent = 'Connected'
+                // console.log({ event: 'onopen' }) // remove
+                mediaRecorder.addEventListener('dataavailable', async (event) => {
+                        if (event.data.size > 0 && socket.readyState == 1) {
+                        socket.send(event.data)
                     }
-
-                    startButton.addEventListener('click', function() {
-                        mediaRecorder.start();
-                    });
-
-                    stopButton.addEventListener('click', function() {
-                        mediaRecorder.stop();
-                    });
+            })
+            mediaRecorder.start(1000)
             }
- 
 
-            navigator.mediaDevices.getUserMedia({ audio: true})
-                .then(getSetup);
-      
+            socket.onmessage = (message) => {
+                const received = message.data
+                if (received) {
+                    console.log(message.data)
+                    document.querySelector('#transcript').textContent = message.data += ' '
+                    // console.log(typeof(msgData))
+
+                    // lineBreak = document.createElement('br')
+                    // const msgData = document.querySelector('#transcript').textContent = message.data + '\n '
+
+                }
+
+           }
+
+           })
+
         </script>
     </body>
 </html>
