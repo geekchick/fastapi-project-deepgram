@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from deepgram import Deepgram
 
 import os
-import re
 
 load_dotenv()
 
